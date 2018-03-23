@@ -1,0 +1,14 @@
+C:\Users\nithin\Documents\Addins\Gesture Typing\Gesture Typing\bin\Debug\Gesture Typing.dll
+C:\Users\nithin\Documents\Addins\Gesture Typing\Gesture Typing\bin\Debug\Gesture Typing.pdb
+C:\Users\nithin\Documents\Addins\Gesture Typing\Gesture Typing\bin\Debug\Gesture Typing.dll.manifest
+C:\Users\nithin\Documents\Addins\Gesture Typing\Gesture Typing\bin\Debug\Gesture Typing.vsto
+C:\Users\nithin\Documents\Addins\Gesture Typing\Gesture Typing\bin\Debug\Microsoft.Office.Tools.Common.v4.0.Utilities.dll
+C:\Users\nithin\Documents\Addins\Gesture Typing\Gesture Typing\obj\Debug\Gesture Typing.csprojResolveAssemblyReference.cache
+C:\Users\nithin\Documents\Addins\Gesture Typing\Gesture Typing\obj\Debug\Gesture_Typing.Form1.resources
+C:\Users\nithin\Documents\Addins\Gesture Typing\Gesture Typing\obj\Debug\Gesture_Typing.Properties.Resources.resources
+C:\Users\nithin\Documents\Addins\Gesture Typing\Gesture Typing\obj\Debug\Gesture_Typing.Ribbon1.resources
+C:\Users\nithin\Documents\Addins\Gesture Typing\Gesture Typing\obj\Debug\Gesture Typing.csproj.GenerateResource.cache
+C:\Users\nithin\Documents\Addins\Gesture Typing\Gesture Typing\obj\Debug\Gesture Typing.csproj.CoreCompileInputs.cache
+C:\Users\nithin\Documents\Addins\Gesture Typing\Gesture Typing\obj\Debug\Gesture Typing.csproj.CopyComplete
+C:\Users\nithin\Documents\Addins\Gesture Typing\Gesture Typing\obj\Debug\Gesture Typing.dll
+C:\Users\nithin\Documents\Addins\Gesture Typing\Gesture Typing\obj\Debug\Gesture Typing.pdb
