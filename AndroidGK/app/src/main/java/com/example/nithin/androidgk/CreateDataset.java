@@ -5,6 +5,10 @@ package com.example.nithin.androidgk;
  */
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -12,24 +16,41 @@ import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnTouchListener;
+import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.EditText;
+import android.widget.TableLayout;
+import android.widget.TableRow;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import org.apache.commons.math.ArgumentOutsideDomainException;
 import org.apache.commons.math.analysis.interpolation.LinearInterpolator;
 import org.apache.commons.math.analysis.polynomials.PolynomialSplineFunction;
+import org.w3c.dom.Text;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.FilenameFilter;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
+import java.util.Scanner;
+import java.util.TreeMap;
+
 
 import umich.cse.yctung.androidlibsvm.LibSVM;
 
@@ -37,6 +58,7 @@ import umich.cse.yctung.androidlibsvm.LibSVM;
 public class CreateDataset extends Activity implements SensorEventListener {
 
     LibSVM svm;
+    TableLayout mTableLayout;
     public File appFolderPath;
     private boolean start = false;
     private boolean flag;
@@ -49,10 +71,12 @@ public class CreateDataset extends Activity implements SensorEventListener {
     private int fno, length = 0;
     private int probability;
 
+
     private String filename = "androidGK_dataset.txt";
     private String filepath = "data";
     File myExternalFile;
-    StringBuilder recordedData;
+    Scanner datasetReader;
+    StringBuilder recordedData, detailssb;
     //Declare buttons & editText
     private Button startButton, trainButton;
 
@@ -62,12 +86,24 @@ public class CreateDataset extends Activity implements SensorEventListener {
     private Sensor gyroSensor;
     private SensorManager SM;
 
-
+    private CheckBox showDetails;
     private EditText characterInput;
     //private EditText editText2;
 
     private String character = "a";
     //private String batch = "0";
+    private TextView classname;
+    private TextView representation;
+    private TextView noClass;
+    private LayoutInflater inflater;
+    //private static TreeMap<String,Integer> dataMap;
+    //private static final String[] TABLE_HEADERS = { "Class", "Representation", "Samples"};
+    //private static final String[][] DATA_TO_SHOW = { { "a", "97", "10" }, { "b", "98", "20" } };
+    private int[] details;
+    private File detailsFile;
+    FileWriter datasetWriter;
+
+    //private BufferedReader detailsReader;
 
     /** Called when the activity is first created. */
     @Override
@@ -98,16 +134,33 @@ public class CreateDataset extends Activity implements SensorEventListener {
         //appFolderPath = systemPath + "data/"; // your datasets folder
         appFolderPath = getExternalFilesDir(filepath); // your datasets folder
 
+        mTableLayout = (TableLayout) findViewById(R.id.datasetTable);
+        //tableView.setColumnCount(3);
+        //TableColumnWeightModel columnModel = new TableColumnWeightModel(3);
+        //columnModel.setColumnWeight(1, 1);
+        //columnModel.setColumnWeight(2, 2);
+        //columnModel.setColumnWeight(3, 1);
+        //tableView.setColumnModel(columnModel);
+        //tableView.setHeaderAdapter(new SimpleTableHeaderAdapter(this, TABLE_HEADERS));
+        //tableView.setDataAdapter(new SimpleTableDataAdapter(this, DATA_TO_SHOW));
+        //int colorEvenRows = getResources().getColor(R.color.white);
+        //int colorOddRows = getResources().getColor(R.color.gray);
+        //tableView.setDataRowBackgroundProvider(TableDataRowBackgroundProviders.alternatingRowColors(colorEvenRows, colorOddRows));
+
+
+
 
         characterInput = (EditText) findViewById(R.id.charInput);
         //editText2 = (EditText) findViewById(R.id.editText2);
         status = (TextView) findViewById(R.id.messageTextView);
         //textview2 = (TextView) findViewById(R.id.textView2);
         fileCountField = (TextView) findViewById(R.id.classCountTextView);
+        showDetails = (CheckBox) findViewById(R.id.showDetails);
 
         status.setText("");
         fileCountField.setText("");
         myExternalFile = new File(appFolderPath, filename);
+
 
         //Initialising buttons in the view
         //mDetect = (Button) findViewById(R.id.mDetect);
@@ -115,7 +168,23 @@ public class CreateDataset extends Activity implements SensorEventListener {
         trainButton = (Button) findViewById(R.id.trainButton);
 
 
+        details = new int[128];
 
+
+        //init();
+
+
+        showDetails.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                if(b){
+                    if(initTable())
+                        mTableLayout.setVisibility(View.VISIBLE);
+                }
+                else
+                    mTableLayout.setVisibility(View.INVISIBLE);
+            }
+        });
 
         //getting the bluetooth adapter value and calling checkBTstate function
 
@@ -165,7 +234,8 @@ public class CreateDataset extends Activity implements SensorEventListener {
                         recordedData = new StringBuilder();
                         fno = 0;
                         length = 0;
-                        status.setText("Recording values in file...");
+                        status.setText("Recording values...");
+                        fileCountField.setText("");
                         start = true;
 
                     }
@@ -174,7 +244,7 @@ public class CreateDataset extends Activity implements SensorEventListener {
                 } else if (event.getAction() == MotionEvent.ACTION_UP) {
                     if (flag) {
                         start = false;
-                        status.setText("predicting");
+                        status.setText("Saved sample");
                         //textview4.setText("");
 
                         fno = 0;
@@ -201,7 +271,10 @@ public class CreateDataset extends Activity implements SensorEventListener {
                         catch (IOException e){
                             e.printStackTrace();
                         }
+                        fileCountField.setText(character + ":" + (++details[classno]));
                         Toast.makeText(getApplicationContext(), "Values for character '" + character + "' recorded successfully!", Toast.LENGTH_SHORT).show();
+                        if(showDetails.isChecked())
+                            initTable();
                     }
                 }
                 return true;
@@ -211,11 +284,36 @@ public class CreateDataset extends Activity implements SensorEventListener {
         trainButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                probability = 1;
-                svm.train("-t 0 -c 0.01 -r 0.0 -m 200 -wi 0 -b " + probability + " " + appFolderPath + "/androidGK_dataset.txt " + appFolderPath + "/androidGK_model.model");
-                status.setText("Model is learning your styles...");
-                Toast.makeText(getApplicationContext(), "SVM Train has executed successfully!", Toast.LENGTH_SHORT).show();
-                status.setText("");
+
+                File[] necessary_File = appFolderPath.listFiles(new FilenameFilter() {
+                    @Override
+                    public boolean accept(File file, String s) {
+                        if(s.matches("androidGK_dataset.txt"))
+                            return true;
+                        else
+                            return false;
+                    }
+                });
+                if(necessary_File.length == 0)
+                {
+                    AlertDialog alertDialog = new AlertDialog.Builder(CreateDataset.this).create();
+                    alertDialog.setTitle("Alert");
+                    alertDialog.setMessage("Dataset file not found!");
+                    alertDialog.setButton(AlertDialog.BUTTON_NEUTRAL, "OK",
+                            new DialogInterface.OnClickListener() {
+                                public void onClick(DialogInterface dialog, int which) {
+                                    dialog.dismiss();
+                                }
+                            });
+                    alertDialog.show();
+                }
+                else {
+                    status.setText("Training is in progress...");
+                    probability = 1;
+                    svm.train("-t 0 -c 0.01 -r 0.0 -m 200 -wi 0 -b " + probability + " " + appFolderPath + "/androidGK_dataset.txt " + appFolderPath + "/androidGK_model.model");
+                    Toast.makeText(getApplicationContext(), "SVM Train has executed successfully!", Toast.LENGTH_SHORT).show();
+                    status.setText("Training successful");
+                }
 
             }
         });
@@ -239,6 +337,9 @@ public class CreateDataset extends Activity implements SensorEventListener {
             }
         });*/
 
+        //new Thread().start();
+
+
     }
 
     private static boolean isExternalStorageReadOnly() {
@@ -255,13 +356,74 @@ public class CreateDataset extends Activity implements SensorEventListener {
     @Override
     public void onResume() {
         super.onResume();
+        //dataMap = new TreeMap<String, Integer>();
+        File[] necessary_File = appFolderPath.listFiles(new FilenameFilter() {
+            @Override
+            public boolean accept(File file, String s) {
+                if(s.matches("androidGK_datasetdetails.txt")) {
+                    Log.d("DEBUGGING", s + ":TRUE");
+                    return true;
+                }
+                else{
+                    Log.d("DEBUGGING",s + ":FALSE");
+                    return false;
+                }
+            }
+        });
+        Log.d("DEBUGGING", "value of necessary_File: " + necessary_File);
+        detailsFile = new File(appFolderPath + "/androidGK_datasetdetails.txt");
+        if(necessary_File.length == 0)
+        {
+            try {
+                datasetWriter = new FileWriter(detailsFile);
+                datasetWriter.write("");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
 
+        int x = 0;
+        try {
+            datasetReader = new Scanner(detailsFile);
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+        while(datasetReader.hasNext())
+        {
+            int classStr = datasetReader.nextInt();
+            details[x++] = classStr;
+            Log.d("DatasetDetailsValue:" , "" + classStr);
+
+        }
     }
 
     @Override
     public void onPause() {
         super.onPause();
-
+        try {
+            datasetWriter = new FileWriter(detailsFile);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        detailssb = new StringBuilder();
+        try {
+            for (int i : details) {
+                detailssb.append(i + " ");
+                Log.d("Updating values:", "" + i);
+            }
+            detailssb.append("\n");
+            Log.d("Updated values:", detailssb.toString());
+            datasetWriter.write(detailssb.toString());
+        }
+        catch(IOException e)
+        {
+            e.printStackTrace();
+        }
+        try {
+            datasetWriter.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
 
@@ -281,12 +443,9 @@ public class CreateDataset extends Activity implements SensorEventListener {
 
             if(start)
             {
-                Log.d("Length: ", "" + length);
                 for(int i=0;i<6;i++){
                     arrays[i][length] = values[i];
-                    Log.d("Sensor Data: ", " " + values[i]);
                 }
-
                 length++;
 
             }
@@ -313,7 +472,76 @@ public class CreateDataset extends Activity implements SensorEventListener {
         return yi;
     }
 
-    /*public void readLogcat(Context context, String title){
+    /*public int classCount(byte cls) {
+        int count = 0;
+        try {
+            datasetReader = new Scanner(myExternalFile);
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+        while(datasetReader.hasNextLine())
+        {
+            String classStr = datasetReader.nextLine().split(" ")[0];
+            if(classStr.equals("" + cls))
+                count++;
+        }
+        return count;
+    }
+    */
+    public boolean initTable()
+    {
+        boolean colorRow = false, datasetCheck = false;
+        int color = getResources().getColor(R.color.gray);
+        mTableLayout = (TableLayout) findViewById(R.id.datasetTable);
+        mTableLayout.removeAllViews();
+        inflater = (LayoutInflater)getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+        View headerRow = inflater.inflate(R.layout.test_tableviewheader, null);
+        mTableLayout.addView(headerRow);
+
+        for(int clsCount=0; clsCount<128; clsCount++)
+        {
+            if (details[clsCount] != 0)
+            {
+                datasetCheck = true;
+
+                View dataRow = inflater.inflate(R.layout.test_tableview, null);
+                TextView tv1 = (TextView) dataRow.findViewById(R.id.classname);
+                TextView tv2 = (TextView) dataRow.findViewById(R.id.representation);
+                TextView tv3 = (TextView) dataRow.findViewById(R.id.samples);
+                tv1.setText("" + (char)clsCount);
+                tv2.setText("" + clsCount);
+                tv3.setText("" + details[clsCount]);
+                if(colorRow)
+                {
+                    tv1.setBackgroundColor(color);
+                    tv2.setBackgroundColor(color);
+                    tv3.setBackgroundColor(color);
+                    colorRow = false;
+                }
+                else
+                    colorRow = true;
+                mTableLayout.addView(dataRow);
+            }
+        }
+        if(!datasetCheck)
+        {
+            mTableLayout.removeAllViews();
+            showDetails.setChecked(false);
+            AlertDialog alertDialog = new AlertDialog.Builder(CreateDataset.this).create();
+            alertDialog.setTitle("Alert");
+            alertDialog.setMessage("Dataset is Empty");
+            alertDialog.setButton(AlertDialog.BUTTON_NEUTRAL, "OK",
+                    new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int which) {
+                            dialog.dismiss();
+                        }
+                    });
+            alertDialog.show();
+        }
+        return datasetCheck;
+    }
+    /*
+    public void readLogcat(Context context, String title){
         try {
             Process process = Runtime.getRuntime().exec("logcat -d");
             BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
@@ -340,8 +568,24 @@ public class CreateDataset extends Activity implements SensorEventListener {
             e.printStackTrace();
             Log.e(MainActivity.TAG, "readLogcat: failed to read from logcat logger.");
         }
+    }
+    public void begin ()
+    {
+        dataMap = new TreeMap<String, Integer>();
+        try {
+            datasetReader = new Scanner(myExternalFile);
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+        while(datasetReader.hasNextLine())
+        {
+            String classStr = datasetReader.nextLine().split(" ")[0];
+            if(dataMap.containsKey(classStr))
+                dataMap.put(classStr, dataMap.get(classStr)+1);
+            else
+                dataMap.put(classStr,1);
+        }
     }*/
-
     @Override
     public void onAccuracyChanged(Sensor arg0, int arg1) {
     }
@@ -369,5 +613,25 @@ public class CreateDataset extends Activity implements SensorEventListener {
         return super.onOptionsItemSelected(item);
     }
 
+    /*private class mThread extends Thread{
+        public void run ()
+        {
+            if(dataMap!=null) {
+                dataMap = new TreeMap<String, Integer>();
+                try {
+                    datasetReader = new Scanner(myExternalFile);
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                }
+                while (datasetReader.hasNextLine()) {
+                    String classStr = datasetReader.nextLine().split(" ")[0];
+                    if (dataMap.containsKey(classStr))
+                        dataMap.put(classStr, dataMap.get(classStr) + 1);
+                    else
+                        dataMap.put(classStr, 1);
+                }
+            }
+        }
+    }*/
 }
 

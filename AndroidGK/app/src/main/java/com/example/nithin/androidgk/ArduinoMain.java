@@ -5,15 +5,18 @@
 package com.example.nithin.androidgk;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
+import android.speech.tts.TextToSpeech;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -21,6 +24,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnTouchListener;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -31,9 +35,11 @@ import org.apache.commons.math.analysis.polynomials.PolynomialSplineFunction;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.Scanner;
 import java.util.UUID;
 
@@ -61,6 +67,7 @@ public class ArduinoMain extends Activity implements SensorEventListener {
 
     private TextView status, outputField, connectionStatus;
     Button predictButton;
+    private CheckBox speak;
     private Sensor accelSensor;
     private Sensor gyroSensor;
     private SensorManager SM;
@@ -81,6 +88,8 @@ public class ArduinoMain extends Activity implements SensorEventListener {
     // MAC-address of Bluetooth module
     public String newAddress = null;
     public String deviceName = null;
+
+    TextToSpeech t1;
 
     /** Called when the activity is first created. */
     @Override
@@ -115,6 +124,7 @@ public class ArduinoMain extends Activity implements SensorEventListener {
         status = (TextView) findViewById(R.id.status);
         outputField = (TextView) findViewById(R.id.output);
         connectionStatus = (TextView) findViewById(R.id.connectionStatus);
+        speak = (CheckBox) findViewById(R.id.speak);
         status.setText("");
         outputField.setText("");
         Intent mIntent = getIntent();
@@ -130,6 +140,15 @@ public class ArduinoMain extends Activity implements SensorEventListener {
         btAdapter = BluetoothAdapter.getDefaultAdapter();
         checkBTState();
 
+
+        t1=new TextToSpeech(getApplicationContext(), new TextToSpeech.OnInitListener() {
+            @Override
+            public void onInit(int status) {
+                if(status != TextToSpeech.ERROR) {
+                    t1.setLanguage(Locale.UK);
+                }
+            }
+        });
         /**************************************************************************************************************************8
          *  Buttons are set up with onclick listeners so when pressed a method is called
          *  In this case send data is called with a value and a toast is made
@@ -200,6 +219,8 @@ public class ArduinoMain extends Activity implements SensorEventListener {
                     svm.predict("-b " + probability + " " + appFolderPath + "/androidGK_test.txt " + appFolderPath + "/androidGK_model.model " + appFolderPath + "/output.txt");
                     String message = displayOutput();
                     sendData(message);
+                    if(speak.isChecked())
+                        t1.speak(message, TextToSpeech.QUEUE_FLUSH, null);
                     Log.d(MainActivity.TAG, "==================\nEnd of SVM PREDICT\n==================");
                     //readLogcat(getApplicationContext(), "SVM-Predict Results");
 
@@ -262,6 +283,37 @@ public class ArduinoMain extends Activity implements SensorEventListener {
     @Override
     public void onResume() {
         super.onResume();
+
+        File[] necessary_File = appFolderPath.listFiles(new FilenameFilter() {
+            @Override
+            public boolean accept(File file, String s) {
+                 if(s.matches("androidGK_model.model")) {
+                     Log.d("DEBUGGING",s + ":TRUE");
+                     return true;
+                 }
+                 else {
+                     Log.d("DEBUGGING",s + ":FALSE");
+                     return false;
+                 }
+            }
+        });
+        if(necessary_File.length == 0)
+        {
+            Log.d("DEBUGGING","NECESSARY_FILE = NULL");
+            AlertDialog alertDialog = new AlertDialog.Builder(ArduinoMain.this).create();
+            alertDialog.setTitle("Alert");
+            alertDialog.setMessage("Necessary files not found!");
+            alertDialog.setButton(AlertDialog.BUTTON_NEUTRAL, "OK",
+                    new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int which) {
+                            dialog.dismiss();
+                            Intent i = new Intent(ArduinoMain.this, MainActivity.class);
+                            startActivity(i);
+                        }
+                    });
+            alertDialog.show();
+        }
+
         // connection methods are best here in case program goes into the background etc
 
         //connection status shows connection is re-establishing
@@ -368,10 +420,8 @@ public class ArduinoMain extends Activity implements SensorEventListener {
 
             if(start)
             {
-                Log.d("Length: ", "" + length);
                 for(int i=0;i<6;i++){
                     arrays[i][length] = values[i];
-                    Log.d("Sensor Data: ", " " + values[i]);
                 }
 
                 length++;
