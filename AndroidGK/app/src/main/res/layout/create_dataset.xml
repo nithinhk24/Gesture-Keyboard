@@ -28,8 +28,7 @@
             android:id="@+id/charInput"
             android:layout_width="120dp"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="10dp"
-            android:maxLength="1" />
+            android:layout_marginLeft="10dp" />
 
         <TextView
             android:id="@+id/messageTextView"

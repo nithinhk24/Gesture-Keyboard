@@ -217,7 +217,26 @@ public class CreateDataset extends Activity implements SensorEventListener {
                         arrays = new double[6][500];
                         new_arrays = new double[6][500];
                         character = characterInput.getText().toString();
-                        classno = character.getBytes(StandardCharsets.US_ASCII)[0];
+                        switch(character)
+                        {
+                            case "DEL": classno = 127;
+                                        break;
+                            case "BS": classno = 8;
+                                        break;
+                            case "HT": classno = 9;
+                                        break;
+                            case "NL": classno = 10;
+                                        break;
+                            case "VT": classno = 11;
+                                        break;
+                            case "NP": classno = 12;
+                                        break;
+                            case "CR": classno = 13;
+                                        break;
+                            default: classno = character.getBytes(StandardCharsets.US_ASCII)[0];
+                                        break;
+                        }
+
                         //batch = editText2.getText().toString();
                         //number = 0;
                         try {

@@ -25,6 +25,7 @@ import android.view.View;
 import android.view.View.OnTouchListener;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -39,9 +40,13 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Scanner;
 import java.util.UUID;
+
+import com.example.nithin.androidgk.hinter;
 
 import umich.cse.yctung.androidlibsvm.LibSVM;
 
@@ -67,7 +72,7 @@ public class ArduinoMain extends Activity implements SensorEventListener {
 
     private TextView status, outputField, connectionStatus;
     Button predictButton;
-    private CheckBox speak;
+    private CheckBox speak,autocorrect;
     private Sensor accelSensor;
     private Sensor gyroSensor;
     private SensorManager SM;
@@ -90,7 +95,8 @@ public class ArduinoMain extends Activity implements SensorEventListener {
     public String deviceName = null;
 
     TextToSpeech t1;
-
+    hinter mHinter;
+    static StringBuilder last_word;
     /** Called when the activity is first created. */
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -120,11 +126,13 @@ public class ArduinoMain extends Activity implements SensorEventListener {
         mytestFile = new File(appFolderPath, "androidGK_test.txt");
         // Assign TextView
 
+        last_word = new StringBuilder();
 
         status = (TextView) findViewById(R.id.status);
         outputField = (TextView) findViewById(R.id.output);
         connectionStatus = (TextView) findViewById(R.id.connectionStatus);
         speak = (CheckBox) findViewById(R.id.speak);
+        autocorrect = (CheckBox) findViewById(R.id.autocorrect);
         status.setText("");
         outputField.setText("");
         Intent mIntent = getIntent();
@@ -146,6 +154,42 @@ public class ArduinoMain extends Activity implements SensorEventListener {
             public void onInit(int status) {
                 if(status != TextToSpeech.ERROR) {
                     t1.setLanguage(Locale.UK);
+                }
+            }
+        });
+        autocorrect.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                if (b) {
+                    File[] necessary_File = appFolderPath.listFiles(new FilenameFilter() {
+                        @Override
+                        public boolean accept(File file, String s) {
+                            if (s.matches("english.txt")) {
+                                Log.d("DEBUGGING", s + ":TRUE");
+                                return true;
+                            } else {
+                                Log.d("DEBUGGING", s + ":FALSE");
+                                return false;
+                            }
+                        }
+                    });
+                    if (necessary_File.length == 0) {
+                        Log.d("DEBUGGING", "NECESSARY_FILE = NULL");
+                        AlertDialog alertDialog = new AlertDialog.Builder(ArduinoMain.this).create();
+                        alertDialog.setTitle("Alert");
+                        alertDialog.setMessage("English dictionary file not found!");
+                        alertDialog.setButton(AlertDialog.BUTTON_NEUTRAL, "OK",
+                                new DialogInterface.OnClickListener() {
+                                    public void onClick(DialogInterface dialog, int which) {
+                                        dialog.dismiss();
+                                        autocorrect.setChecked(false);
+                                    }
+                                });
+                        alertDialog.show();
+                    } else {
+                        mHinter = new hinter();
+                        mHinter.words = hinter.load_english_dict(new File(appFolderPath, "english.txt"));
+                    }
                 }
             }
         });
@@ -255,6 +299,7 @@ public class ArduinoMain extends Activity implements SensorEventListener {
         Scanner mScanner = null;
         //FileReader outputReader = null;
         char outputLetter = '\0';
+        byte outputByte =0;
         int i = 0;
         try{
             //outputReader = new FileReader(output);
@@ -263,15 +308,37 @@ public class ArduinoMain extends Activity implements SensorEventListener {
         catch (FileNotFoundException e){
             e.printStackTrace();
         }
-        if(mScanner.hasNext())
-            if(probability==0)
-                outputLetter = (char) Byte.parseByte(mScanner.nextLine());
-            else if(probability==1) {
+        if(mScanner.hasNext()) {
+            if (probability == 0) {
+                outputByte = Byte.parseByte(mScanner.nextLine());
+                Log.d("byte val", "" + outputByte);
+                outputLetter = (char) outputByte;
+            } else if (probability == 1) {
                 mScanner.nextLine();
-                if (mScanner.hasNext())
-                    outputLetter = (char) Byte.parseByte(mScanner.nextLine().split(" ")[0]);
-
+                if (mScanner.hasNext()) {
+                    outputByte = Byte.parseByte(mScanner.nextLine().split(" ")[0]);
+                    Log.d("byte val", "" + outputByte);
+                    outputLetter = (char) outputByte;
+                }
             }
+        }
+        if(Character.isLowerCase(outputLetter) && autocorrect.isChecked()) {
+            Log.d("EXACT PREDICTED CHAR", "" + outputLetter);
+            char cross_calc_char = mHinter.most_probable_letter(output, last_word.toString());
+            Log.d("CROSS CALCULATED C VAL", "" + cross_calc_char);
+            if (cross_calc_char != '\0') {
+                outputLetter = cross_calc_char;
+                Log.d("CROSS CALCULATED CHAR", "" + outputLetter);
+            }
+
+            if (outputByte == 32 || outputByte == 10 || outputByte == 12)
+                last_word.delete(0, last_word.length());
+            else
+                last_word.append(outputLetter);
+
+            Log.d("After concatenation", last_word.toString());
+        }
+
         status.setText("predicted letter");
         String outputLetterInString = String.valueOf(outputLetter);
         outputField.setText(outputLetterInString);
@@ -475,8 +542,4 @@ public class ArduinoMain extends Activity implements SensorEventListener {
 
         return super.onOptionsItemSelected(item);
     }
-
-
-
-
 }
